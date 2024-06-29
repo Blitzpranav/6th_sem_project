@@ -1,0 +1,264 @@
+import cv2
+import os
+import numpy as np
+import PIL.Image
+def face_train():
+face_id = None
+userLabel = Label(frame2, text = "Enter the user name: ",bg="gray47", font = f2)
+userLabel.grid(row=1, column= 0, padx=5, pady = 5)
+userEntry = Entry(frame2, width=10)
+userEntry.grid(row=1, column=1, columnspan = 2, padx=2)
+log.configure(text = "Type name and press ENTER")
+root.update()
+def setFaceId(event):
+username = userEntry.get().lower()
+log.configure(text = "[INFO] Initializing face capture. Look at the camera and wait
+...")
+root.update()
+train(username)
+userEntry.bind('<Return>', setFaceId)
+def train(username):
+def getKey(val):
+for key, value in names.items():
+if val == value:
+return key
+if username not in names.values():
+last = len(names)
+names[last] = username
+l = Label(frame3, text = str(last)+". "+ username.title(), bg="gray47")
+l.grid(row = last+1, column = 0, sticky = W)
+root.update()
+else:
+last = getKey(username)
+cam = cv2.VideoCapture(0)
+cam.set(3, 640) # set video width
+cam.set(4, 480) # set video height
+face_detector = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+# Initialize individual sampling face count
+count = 0
+log.configure(text = "Collecting data...")
+root.update()
+while(True):
+ret, img = cam.read()
+#img = cv2.flip(img, -1) # flip video image vertically
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+faces = face_detector.detectMultiScale(gray, 1.3, 5)
+for (x,y,w,h) in faces:
+cv2.rectangle(img, (x,y), (x+w,y+h), (255,0,0), 2)
+count += 1
+# Save the captured image into the datasets folder
+cv2.imwrite("./dataset/" + username + '.' + str(last) + '.' + str(count) + ".jpg",
+gray[y:y+h,x:x+w])
+cv2.imshow('image', img)
+#print("dataset/User." + str(face_id) + '.' + str(count) + ".jpg")
+k = cv2.waitKey(100) & 0xff # Press 'ESC' for exiting video
+if k == 27:
+break
+elif count >= 30: # Take 30 face sample and stop video
+break
+# Do a bit of cleanup
+log.configure(text = "[INFO] Finished.")
+root.update()
+cam.release()
+cv2.destroyAllWindows()
+return
+def face_predict():
+# Path for face image database
+path = "./dataset/"
+recognizer = cv2.face.LBPHFaceRecognizer_create()
+detector = cv2.CascadeClassifier("haarcascade_frontalface_default.xml");
+# function to get the images and label data
+def getImagesAndLabels(path):
+imagePaths = [os.path.join(path,f) for f in os.listdir(path)]
+faceSamples=[]
+ids = []
+for imagePath in imagePaths:
+PIL_img = PIL.Image.open(imagePath).convert('L') # convert it to grayscale
+img_numpy = np.array(PIL_img,'uint8')
+id = int(os.path.split(imagePath)[-1].split(".")[1])
+faces = detector.detectMultiScale(img_numpy)
+for (x,y,w,h) in faces:
+faceSamples.append(img_numpy[y:y+h,x:x+w])
+ids.append(id)
+return faceSamples,ids
+print ("\n [INFO] Training faces. It will take a few seconds. Wait ...")
+log.configure(text = "[INFO] Training faces. It will take a few seconds. Wait ...")
+root.update()
+faces,ids = getImagesAndLabels(path)
+recognizer.train(faces, np.array(ids))
+# Save the model into trainer/trainer.yml
+recognizer.write('trainer.yml') # recognizer.save() worked on Mac, but not on Pi
+# Print the numer of faces trained and end program
+print("\n [INFO] {0} faces trained".format(len(np.unique(ids))))
+log.configure(text = "[INFO] {0} faces trained.".format(len(np.unique(ids))) + " Press
+Esc to quit")
+root.update()
+recognizer = cv2.face.LBPHFaceRecognizer_create()
+recognizer.read('trainer.yml')
+cascadePath = "haarcascade_frontalface_default.xml"
+faceCascade = cv2.CascadeClassifier(cascadePath);
+font = cv2.FONT_HERSHEY_SIMPLEX
+#indicate id counter
+id = 0
+# Initialize and start realtime video capture
+cam = cv2.VideoCapture(0)
+cam.set(3, 640) # set video widht
+cam.set(4, 480) # set video height
+# Define min window size to be recognized as a face
+minW = 0.1*cam.get(3)
+minH = 0.1*cam.get(4)
+while True:
+ret, img =cam.read()
+#img = cv2.flip(img, -1) # Flip vertically
+gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+faces = faceCascade.detectMultiScale(
+gray,
+scaleFactor = 1.2,
+minNeighbors = 5,
+minSize = (int(minW), int(minH)),
+)
+for(x,y,w,h) in faces:
+cv2.rectangle(img, (x,y), (x+w,y+h), (0,255,0), 2)
+id, confidence = recognizer.predict(gray[y:y+h,x:x+w])
+# Check if confidence is less them 100 ==> "0" is perfect match
+if (confidence < 100):
+id = names[id]
+confidence = " {0}%".format(round(100 - confidence))
+else:
+id = "unknown"
+confidence = " {0}%".format(round(100 - confidence))
+cv2.putText(img, str(id).title(), (x+5,y-5), font, 1, (255,255,255), 2)
+cv2.putText(img, str(confidence), (x+5,y+h-5), font, 1, (255,255,0), 1)
+cv2.imshow('Detecting...',img)
+k = cv2.waitKey(10) & 0xff # Press 'ESC' for exiting video
+if k == 27:
+break
+# Do a bit of cleanup
+print("\n [INFO] Exiting Program and cleanup stuff")
+log.configure(text = "\n [INFO] Exiting Program and cleanup stuff")
+root.update()
+cam.release()
+cv2.destroyAllWindows()
+return
+MODULE 2: Drowsiness Detection system
+from scipy.spatial import distance
+from imutils import face_utils
+import imutils
+import dlib
+import cv2
+import pygame
+def drowsiness():
+log.configure(text = "[INFO] App starting. Press Esc to quit")
+root.update()
+def eye_aspect_ratio(eye):
+A = distance.euclidean(eye[1], eye[5])
+B = distance.euclidean(eye[2], eye[4])
+C = distance.euclidean(eye[0], eye[3])
+ear = (A + B) / (2.0 * C)
+return ear
+thresh = 0.25
+frame_check = 20
+detect = dlib.get_frontal_face_detector()
+predict = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
+(lStart, lEnd) = face_utils.FACIAL_LANDMARKS_IDXS["left_eye"]
+(rStart, rEnd) = face_utils.FACIAL_LANDMARKS_IDXS["right_eye"]
+#Initialize Pygame and load music
+import pygame
+pygame.mixer.init()
+pygame.mixer.music.load('beep-04.mp3')
+cap=cv2.VideoCapture(0)
+flag=0
+while True:
+ret, frame=cap.read()
+frame = imutils.resize(frame, width=450)
+gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+subjects = detect(gray, 0)
+for subject in subjects:
+shape = predict(gray, subject)
+shape = face_utils.shape_to_np(shape)#converting to NumPy Array
+leftEye = shape[lStart:lEnd]
+rightEye = shape[rStart:rEnd]
+leftEAR = eye_aspect_ratio(leftEye)
+rightEAR = eye_aspect_ratio(rightEye)
+ear = (leftEAR + rightEAR) / 2.0
+leftEyeHull = cv2.convexHull(leftEye)
+rightEyeHull = cv2.convexHull(rightEye)
+cv2.drawContours(frame, [leftEyeHull], -1, (0, 255, 0), 1)
+cv2.drawContours(frame, [rightEyeHull], -1, (0, 255, 0), 1)
+if ear < thresh:
+flag += 1
+#print (flag)
+if flag >= frame_check:
+pygame.mixer.music.play(-1)
+cv2.putText(frame, "****************ALERT!****************", (10, 30),
+cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+cv2.putText(frame, "**************Driver is drowsy**************",
+(10,325),
+cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+else:
+pygame.mixer.music.stop()
+flag = 0
+cv2.imshow("Drowsiness Detector", frame)
+key = cv2.waitKey(10) & 0xFF
+if key == 27:
+pygame.mixer.music.stop()
+cv2.destroyAllWindows()
+cap.release()
+break
+MODULE 3: GUI
+from tkinter import *
+# names related to ids: example ==> Marcelo: id=1, etc
+names = {}
+root = Tk()
+root.title("Face Recognition and Drowsiness Detection")
+root.geometry("500x350")
+root.configure(bg="gray27")
+# Fonts
+f1 = ("Comic Sans MS", 15)
+f2 = ("Comic Sans MS", 10)
+f3 = ("Arial Bold", 10)
+f4 = ("Nimbus Mono L", 9)
+frame1 = Frame(root,bg="gray47", bd = 5, relief = GROOVE)
+menu = Label(frame1, text="Choose an option from below: ",bg="gray47", font = f1)
+menu.grid(row=0, column = 0, columnspan=2, padx = 10, pady=10)
+path = "dataset"
+imagePaths = [os.path.join(path,f) for f in os.listdir(path)]
+frame2 = Frame(root,bg="gray47", bd = 5, relief = GROOVE)
+frame3 = Frame(root,bg="gray47", bd = 5, relief = GROOVE)
+def face_recog():
+for imagePath in imagePaths:
+id = int(os.path.split(imagePath)[-1].split(".")[1])
+name = str(os.path.split(imagePath)[-1].split(".")[0])
+if id not in names.keys():
+names[id] = name
+lbl1 = Label(frame2, text="Train/Predict?",bg="gray47", font = f2)
+lbl1.grid(row=0, column=0, pady=10)
+train = Button(frame2, text = "Train",bg="gray63", font = f3, command = face_train)
+predict = Button(frame2, text = "Predict",bg="gray63", font = f3, command =
+face_predict)
+train.grid(row=0, column=1, padx=2)
+predict.grid(row=0, column=2, padx=5)
+frame2.place(relx=0.05, rely=0.4, anchor=NW)
+l = Label(frame3, text="Trained users: ",bg="gray47", font = f2)
+l.grid(row=0, column=0)
+if len(names) == 0:
+l = Label(frame3, text = "(None)",bg="gray47")
+l.grid(row = 1, column = 0, sticky = W)
+for i in range(len(names)):
+l = Label(frame3, text = str(i)+". "+names[i].title(),bg="gray47")
+l.grid(row = i+1, column = 0, sticky = W)
+frame3.place(relx = 0.7, rely = 0.4, anchor = NW)
+return
+fButton = Button(frame1, text="Face Recognition",bg="gray63", font = f3, command =
+face_recog)
+fButton.grid(row=1, column = 0, padx = 10, pady = 10)
+dButton = Button(frame1, text="Drowsiness Detection",bg="gray63", font = f3, command
+= drowsiness)
+dButton.grid(row=1, column = 1, padx = 10, pady = 10)
+frame1.place(relx = 0.5, rely = 0.2, anchor = CENTER)
+frame4 = Frame(root, bg = "gray27", bd = 5, height = 100, width = 300)
+frame4.place(relx=0, rely=1, anchor = SW)
+frame4.pack_propagate(0)
+log = Label(root, text = "", bg = "gray27", font = f4)
+log.place(relx = 0, rely = 1, anchor = SW)
+root.mainloop(
